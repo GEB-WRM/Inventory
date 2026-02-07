@@ -162,7 +162,7 @@
                 <div class="contact-info">
                     <div><strong>Will McGowen</strong></div>
                     <div><a href="tel:317-767-1849">📞 317-767-1849</a></div>
-                    <div><a href="mailto:will.mcgowen@gebooth.com">✉️ will.mcgowen@gebooth.com</a></div>
+                    <div><a href="/cdn-cgi/l/email-protection#7f0816131351121c1810081a113f181a1d10100b17511c1012">✉️ <span class="__cf_email__" data-cfemail="a7d0cecbcb89cac4c0c8d0c2c9e7c0c2c5c8c8d3cf89c4c8ca">[email&#160;protected]</span></a></div>
                 </div>
             </div>
         </div>
@@ -624,7 +624,7 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         let inventory = [];
         let projects = [];
@@ -1161,7 +1161,10 @@
 
         function renderProjects() {
             const container = document.getElementById('projectsList');
-            const filter = document.getElementById('filterProjectStatus').value;
+            if (!container) return;
+            
+            const filterSelect = document.getElementById('filterProjectStatus');
+            const filter = filterSelect ? filterSelect.value : '';
             
             const filtered = filter ? projects.filter(p => p.status === filter) : projects;
             const sorted = filtered.sort((a, b) => b.timestamp - a.timestamp);
@@ -1171,7 +1174,9 @@
                 return;
             }
 
-            container.innerHTML = sorted.map((project) => `
+            container.innerHTML = sorted.map((project) => {
+                const actualIndex = projects.findIndex(p => p.id === project.id);
+                return `
                 <div class="project-card">
                     <div class="project-header">
                         <div style="flex: 1;">
@@ -1185,15 +1190,17 @@
                             ${project.status === 'Pending' ? `<div class="timeline-info">⏰ Response expected by: <strong>${project.responseBy}</strong></div>` : ''}
                         </div>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button class="btn btn-secondary" onclick="viewProject(${projects.indexOf(project)})">View Details</button>
-                            <button class="btn btn-secondary" onclick="editProject(${projects.indexOf(project)})">Edit</button>
-                            ${project.status === 'Pending' ? `<button class="btn btn-success" onclick="markAsQuoted(${projects.indexOf(project)})">Mark as Quoted</button>` : ''}
-                            ${project.status === 'Quoted' ? `<button class="btn btn-success" onclick="markAsClosed(${projects.indexOf(project)})">Close Project</button>` : ''}
+                            <button class="btn btn-secondary" onclick="viewProject(${actualIndex})">View Details</button>
+                            <button class="btn btn-secondary" onclick="editProject(${actualIndex})">Edit</button>
+                            ${project.status === 'Pending' ? `<button class="btn btn-success" onclick="markAsQuoted(${actualIndex})">Mark as Quoted</button>` : ''}
+                            ${project.status === 'Quoted' ? `<button class="btn btn-success" onclick="markAsClosed(${actualIndex})">Close Project</button>` : ''}
+                            <button class="btn btn-danger" onclick="deleteProject(${actualIndex})">Delete</button>
                         </div>
                     </div>
                     <div><strong>BOM Items:</strong> ${project.bom.length} | <strong>Photos:</strong> ${project.photos.length}</div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function editProject(index) {
@@ -1312,6 +1319,18 @@
             await saveProjects();
             renderProjects();
             updateProjectStats();
+        }
+
+        async function deleteProject(index) {
+            const project = projects[index];
+            if (!confirm(`Delete project "${project.name}"? This action cannot be undone.`)) return;
+            
+            projects.splice(index, 1);
+            await saveProjects();
+            renderProjects();
+            updateProjectStats();
+            renderSitesOnMap();
+            alert('Project deleted successfully!');
         }
 
         function generateQuoteList() {
