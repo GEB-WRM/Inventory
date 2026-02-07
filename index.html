@@ -114,7 +114,7 @@
         .status-quoted { background: #E0F2FE; color: #075985; }
         .status-closed { background: #E2E8F0; color: #475569; }
         input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto; }
         .modal.active { display: flex; }
         .modal-content { background: var(--surface); padding: 2rem; border-radius: 12px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; border-top: 4px solid var(--primary); }
         .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
@@ -128,16 +128,18 @@
         .owner-badge { display: inline-block; padding: 0.25rem 0.75rem; background: var(--secondary); color: white; border-radius: 15px; font-size: 0.75rem; margin-right: 0.5rem; }
         .timeline-info { background: #FFF9E6; padding: 0.75rem; border-radius: 6px; border-left: 3px solid #D69E2E; margin-top: 0.5rem; font-size: 0.85rem; }
         .bom-item { background: var(--bg); padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
-        .photo-preview { display: inline-block; width: 100px; height: 100px; object-fit: cover; border-radius: 8px; margin: 0.5rem 0.5rem 0.5rem 0; cursor: pointer; }
-        .photo-preview:hover { opacity: 0.8; }
+        .photo-preview { display: inline-block; width: 100px; height: 100px; object-fit: cover; border-radius: 8px; margin: 0.5rem 0.5rem 0.5rem 0; cursor: pointer; border: 2px solid var(--border); }
+        .photo-preview:hover { opacity: 0.8; border-color: var(--primary); }
         .file-input-label { display: inline-block; padding: 0.5rem 1rem; background: var(--secondary); color: white; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
         .file-input-label:hover { background: #1A202C; }
         input[type="file"] { display: none; }
         
-        #map, #siteMap { height: 600px; width: 100%; border-radius: 12px; box-shadow: 0 2px 8px var(--shadow); }
+        #map, #siteMap { height: 600px; width: 100%; border-radius: 12px; box-shadow: 0 2px 8px var(--shadow); margin-bottom: 2rem; }
         .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s; }
         .upload-zone:hover { border-color: var(--primary); background: var(--bg); }
         .upload-zone.dragover { border-color: var(--primary); background: #FFF5F5; }
+        
+        .quote-output { background: var(--bg); border: 2px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-top: 1.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
         
         @media (max-width: 768px) {
             .header-content { flex-direction: column; }
@@ -440,11 +442,13 @@
         
         <div id="locations-assets" class="subcontent active">
             <div class="container">
+                <div id="map"></div>
+                
                 <div class="controls">
                     <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Upload Asset List</h2>
                     <p style="margin-bottom: 1rem;">Upload an Excel file (.xlsx or .csv) with columns: Name, Latitude, Longitude, and any other details you want to display.</p>
                     
-                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('assetFile').click()">
+                    <div class="upload-zone" id="assetUploadZone" onclick="document.getElementById('assetFile').click()">
                         <input type="file" id="assetFile" accept=".xlsx,.xls,.csv" onchange="handleAssetUpload(event)" style="display:none;">
                         <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
                         <h3>Click to upload or drag & drop</h3>
@@ -456,19 +460,29 @@
                         <button class="btn btn-danger" onclick="clearAssets()" style="margin-top: 0.5rem;">Clear All Assets</button>
                     </div>
                 </div>
-
-                <div id="map"></div>
             </div>
         </div>
         
         <div id="locations-sites" class="subcontent">
             <div class="container">
-                <div class="controls">
-                    <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Project Sites</h2>
-                    <p style="margin-bottom: 1rem;">View all project locations on the map</p>
-                </div>
-
                 <div id="siteMap"></div>
+                
+                <div class="controls">
+                    <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Upload Site List</h2>
+                    <p style="margin-bottom: 1rem;">Upload an Excel file (.xlsx or .csv) with columns: Name, Latitude, Longitude, and any other site details.</p>
+                    
+                    <div class="upload-zone" id="siteUploadZone" onclick="document.getElementById('siteFile').click()">
+                        <input type="file" id="siteFile" accept=".xlsx,.xls,.csv" onchange="handleSiteUpload(event)" style="display:none;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
+                        <h3>Click to upload or drag & drop</h3>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;">Excel (.xlsx, .xls) or CSV files</p>
+                    </div>
+                    
+                    <div id="siteStats" style="margin-top: 1rem; display: none;">
+                        <p><strong>Loaded Sites:</strong> <span id="siteCount">0</span></p>
+                        <button class="btn btn-danger" onclick="clearSites()" style="margin-top: 0.5rem;">Clear All Sites</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -544,14 +558,69 @@
         </div>
     </div>
 
+    <!-- Edit Project Modal -->
+    <div class="modal" id="editProjectModal">
+        <div class="modal-content">
+            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Edit Project</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Project Name <span class="required">*</span></label>
+                    <input type="text" id="editProjectName">
+                </div>
+                <div class="form-group">
+                    <label>Project Owner <span class="required">*</span></label>
+                    <select id="editProjectOwner">
+                        <option>Will M</option>
+                        <option>Mike O</option>
+                        <option>Devin T</option>
+                        <option>Eric P</option>
+                        <option>Troy B</option>
+                        <option>Jason G</option>
+                        <option>Sales4</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group full-width" style="margin: 1rem 0;">
+                <label>Description</label>
+                <textarea id="editProjectDescription"></textarea>
+            </div>
+            <div class="form-group full-width" style="margin-bottom: 1rem;">
+                <label>Address</label>
+                <input type="text" id="editProjectAddress">
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Latitude</label>
+                    <input type="number" id="editProjectLat" step="any">
+                </div>
+                <div class="form-group">
+                    <label>Longitude</label>
+                    <input type="number" id="editProjectLng" step="any">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="saveProjectEdit()">Save Changes</button>
+                <button class="btn btn-secondary" onclick="closeEditProjectModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- View Project Modal -->
     <div class="modal" id="viewProjectModal">
         <div class="modal-content">
             <div id="projectDetailContent"></div>
+            <div id="quoteOutputContainer"></div>
             <div class="modal-buttons">
                 <button class="btn btn-success" onclick="generateQuoteList()">📋 Generate Quote List</button>
                 <button class="btn btn-secondary" onclick="closeViewProjectModal()">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div class="modal" id="imageModal" onclick="closeImageModal()">
+        <div style="max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center;">
+            <img id="modalImage" style="max-width: 100%; max-height: 90vh; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.5);">
         </div>
     </div>
 
@@ -560,8 +629,10 @@
         let inventory = [];
         let projects = [];
         let assets = [];
+        let sites = [];
         let currentEditIndex = null;
         let currentProjectIndex = null;
+        let currentEditProjectIndex = null;
         let currentBOMItems = [];
         let currentPhotos = [];
         let map = null;
@@ -571,6 +642,7 @@
         const STORAGE_KEY = 'geb_inventory';
         const PROJECTS_KEY = 'geb_projects';
         const ASSETS_KEY = 'geb_assets';
+        const SITES_KEY = 'geb_sites';
 
         const storage = {
             async set(key, value) {
@@ -606,6 +678,7 @@
             loadInventory();
             loadProjects();
             loadAssets();
+            loadSites();
             initMaps();
         });
 
@@ -985,12 +1058,17 @@
         function renderPhotoPreview() {
             const preview = document.getElementById('photoPreview');
             preview.innerHTML = currentPhotos.map((photo, index) => `
-                <img src="${photo}" class="photo-preview" onclick="viewPhoto(${index})" />
+                <img src="${photo}" class="photo-preview" onclick="viewFullImage('${photo}')" />
             `).join('');
         }
 
-        function viewPhoto(index) {
-            window.open(currentPhotos[index], '_blank');
+        function viewFullImage(src) {
+            document.getElementById('modalImage').src = src;
+            document.getElementById('imageModal').classList.add('active');
+        }
+
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.remove('active');
         }
 
         function getCurrentLocation() {
@@ -1108,6 +1186,7 @@
                         </div>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                             <button class="btn btn-secondary" onclick="viewProject(${projects.indexOf(project)})">View Details</button>
+                            <button class="btn btn-secondary" onclick="editProject(${projects.indexOf(project)})">Edit</button>
                             ${project.status === 'Pending' ? `<button class="btn btn-success" onclick="markAsQuoted(${projects.indexOf(project)})">Mark as Quoted</button>` : ''}
                             ${project.status === 'Quoted' ? `<button class="btn btn-success" onclick="markAsClosed(${projects.indexOf(project)})">Close Project</button>` : ''}
                         </div>
@@ -1115,6 +1194,48 @@
                     <div><strong>BOM Items:</strong> ${project.bom.length} | <strong>Photos:</strong> ${project.photos.length}</div>
                 </div>
             `).join('');
+        }
+
+        function editProject(index) {
+            currentEditProjectIndex = index;
+            const project = projects[index];
+            
+            document.getElementById('editProjectName').value = project.name;
+            document.getElementById('editProjectOwner').value = project.owner;
+            document.getElementById('editProjectDescription').value = project.description || '';
+            document.getElementById('editProjectAddress').value = project.address || '';
+            document.getElementById('editProjectLat').value = project.latitude || '';
+            document.getElementById('editProjectLng').value = project.longitude || '';
+            
+            document.getElementById('editProjectModal').classList.add('active');
+        }
+
+        async function saveProjectEdit() {
+            if (currentEditProjectIndex === null) return;
+            
+            const oldProject = projects[currentEditProjectIndex];
+            
+            projects[currentEditProjectIndex] = {
+                ...oldProject,
+                name: document.getElementById('editProjectName').value.trim(),
+                owner: document.getElementById('editProjectOwner').value,
+                description: document.getElementById('editProjectDescription').value.trim(),
+                address: document.getElementById('editProjectAddress').value.trim() || null,
+                latitude: parseFloat(document.getElementById('editProjectLat').value) || null,
+                longitude: parseFloat(document.getElementById('editProjectLng').value) || null,
+                responseBy: calculateResponseDate(document.getElementById('editProjectOwner').value)
+            };
+
+            await saveProjects();
+            closeEditProjectModal();
+            renderProjects();
+            updateProjectStats();
+            renderSitesOnMap();
+        }
+
+        function closeEditProjectModal() {
+            document.getElementById('editProjectModal').classList.remove('active');
+            currentEditProjectIndex = null;
         }
 
         function viewProject(index) {
@@ -1161,12 +1282,12 @@
                 ${project.photos.length > 0 ? `
                     <div style="margin-top: 1.5rem;">
                         <h3 style="margin-bottom: 0.5rem;">Photos</h3>
-                        ${project.photos.map((photo, i) => `<img src="${photo}" class="photo-preview" onclick="viewPhoto(${i})" />`).join('')}
+                        ${project.photos.map(photo => `<img src="${photo}" class="photo-preview" onclick="viewFullImage('${photo}')" />`).join('')}
                     </div>
                 ` : ''}
             `;
             
-            currentPhotos = [...project.photos];
+            document.getElementById('quoteOutputContainer').innerHTML = '';
             document.getElementById('viewProjectModal').classList.add('active');
         }
 
@@ -1222,13 +1343,9 @@
                 text += `\n--- PROJECT NOTES ---\n${project.description}\n`;
             }
             
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Quote_${project.name.replace(/\s+/g, '_')}_${Date.now()}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
+            document.getElementById('quoteOutputContainer').innerHTML = `
+                <div class="quote-output">${text}</div>
+            `;
         }
 
         function updateProjectStats() {
@@ -1271,6 +1388,26 @@
             }
         }
 
+        async function loadSites() {
+            try {
+                const data = await storage.get(SITES_KEY);
+                if (data && data.value) {
+                    sites = JSON.parse(data.value);
+                    updateSiteCount();
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+        }
+
+        async function saveSites() {
+            try {
+                await storage.set(SITES_KEY, JSON.stringify(sites));
+            } catch (error) {
+                console.error('Save error:', error);
+            }
+        }
+
         function handleAssetUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1298,9 +1435,41 @@
             reader.readAsArrayBuffer(file);
         }
 
+        function handleSiteUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                sites = jsonData.filter(row => row.Latitude && row.Longitude).map(row => ({
+                    name: row.Name || 'Unnamed Site',
+                    latitude: parseFloat(row.Latitude),
+                    longitude: parseFloat(row.Longitude),
+                    ...row
+                }));
+
+                saveSites();
+                updateSiteCount();
+                renderSitesOnMap();
+                alert(`Loaded ${sites.length} sites with valid coordinates`);
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
         function updateAssetCount() {
             document.getElementById('assetCount').textContent = assets.length;
             document.getElementById('assetStats').style.display = assets.length > 0 ? 'block' : 'none';
+        }
+
+        function updateSiteCount() {
+            document.getElementById('siteCount').textContent = sites.length;
+            document.getElementById('siteStats').style.display = sites.length > 0 ? 'block' : 'none';
         }
 
         function renderAssetsOnMap() {
@@ -1329,13 +1498,10 @@
             siteMarkers.forEach(m => siteMap.removeLayer(m));
             siteMarkers = [];
 
-            const sitesWithLocations = projects.filter(p => p.latitude && p.longitude);
+            const allSites = [...sites];
             
-            if (sitesWithLocations.length === 0) return;
-
-            const bounds = [];
-
-            sitesWithLocations.forEach(project => {
+            // Add projects with locations to site map
+            projects.filter(p => p.latitude && p.longitude).forEach(project => {
                 const color = project.status === 'Pending' ? '#D69E2E' : project.status === 'Quoted' ? '#3182CE' : '#38A169';
                 const icon = L.divIcon({
                     className: 'custom-div-icon',
@@ -1351,11 +1517,20 @@
                     .bindPopup(popupContent);
                 
                 siteMarkers.push(marker);
-                bounds.push([project.latitude, project.longitude]);
             });
 
-            if (bounds.length > 0) {
-                siteMap.fitBounds(bounds, { padding: [50, 50] });
+            // Add uploaded sites
+            sites.forEach(site => {
+                const marker = L.marker([site.latitude, site.longitude])
+                    .addTo(siteMap)
+                    .bindPopup(`<strong>${site.name}</strong><br>${Object.entries(site).filter(([k]) => k !== 'latitude' && k !== 'longitude' && k !== 'Latitude' && k !== 'Longitude').map(([k, v]) => `${k}: ${v}`).join('<br>')}`);
+                
+                siteMarkers.push(marker);
+            });
+
+            if (siteMarkers.length > 0) {
+                const group = L.featureGroup(siteMarkers);
+                siteMap.fitBounds(group.getBounds().pad(0.1));
             }
         }
 
@@ -1368,35 +1543,47 @@
             renderAssetsOnMap();
         }
 
-        // Drag and drop support
-        const uploadZone = document.getElementById('uploadZone');
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
+        async function clearSites() {
+            if (!confirm('Clear all sites from the map?')) return;
+            
+            sites = [];
+            await saveSites();
+            updateSiteCount();
+            renderSitesOnMap();
         }
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, () => uploadZone.classList.add('dragover'), false);
-        });
+        // Drag and drop support
+        function setupDragDrop(zoneId, fileInputId, handler) {
+            const zone = document.getElementById(zoneId);
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+            });
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, () => uploadZone.classList.remove('dragover'), false);
-        });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                zone.addEventListener(eventName, () => zone.classList.add('dragover'), false);
+            });
 
-        uploadZone.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            document.getElementById('assetFile').files = files;
-            handleAssetUpload({ target: { files } });
-        });
+            ['dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, () => zone.classList.remove('dragover'), false);
+            });
 
-        // Modal close on outside click
+            zone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                document.getElementById(fileInputId).files = files;
+                handler({ target: { files } });
+            });
+        }
+
+        setupDragDrop('assetUploadZone', 'assetFile', handleAssetUpload);
+        setupDragDrop('siteUploadZone', 'siteFile', handleSiteUpload);
+
+        // Modal close
         document.getElementById('editModal').addEventListener('click', function(e) {
             if (e.target === this) closeEditModal();
+        });
+        
+        document.getElementById('editProjectModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditProjectModal();
         });
         
         document.getElementById('viewProjectModal').addEventListener('click', function(e) {
