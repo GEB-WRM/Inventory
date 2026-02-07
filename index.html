@@ -1,10 +1,13 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>George E Booth Co. - IL American Water Inventory</title>
+    <title>George E. Booth Co., LLC - IL American Water</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -18,12 +21,49 @@
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white; padding: 2rem; box-shadow: 0 4px 24px var(--shadow);
         }
-        .header-content { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 2rem; }
+        .header-content { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: start; gap: 2rem; }
+        .header-left { flex: 1; }
+        .header-right { text-align: right; }
         .header h1 { font-size: 2.25rem; font-weight: 700; margin-bottom: 0.5rem; }
         .header .subtitle { font-size: 1rem; opacity: 0.95; margin-bottom: 0.5rem; }
-        .header .address { font-size: 0.9rem; opacity: 0.9; }
+        .header .address { font-size: 0.9rem; opacity: 0.9; margin-top: 0.5rem; }
         .header .address a { color: white; text-decoration: underline; }
-        .header .address a:hover { opacity: 0.8; }
+        .contact-info { font-size: 0.9rem; }
+        .contact-info div { margin-bottom: 0.25rem; }
+        .contact-info a { color: white; text-decoration: none; }
+        .contact-info a:hover { text-decoration: underline; }
+        
+        .tabs { 
+            max-width: 1400px; margin: 0 auto; display: flex; gap: 0.5rem; 
+            background: white; padding: 1rem 2rem 0; box-shadow: 0 2px 4px var(--shadow);
+        }
+        .tab { 
+            padding: 0.75rem 1.5rem; border: none; background: transparent; 
+            cursor: pointer; font-family: 'IBM Plex Mono', monospace; 
+            font-size: 0.9rem; font-weight: 600; text-transform: uppercase;
+            border-bottom: 3px solid transparent; transition: all 0.3s;
+        }
+        .tab:hover { background: var(--bg); }
+        .tab.active { border-bottom-color: var(--primary); color: var(--primary); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .subtabs {
+            max-width: 1400px; margin: 0 auto; display: flex; gap: 0.5rem;
+            background: var(--bg); padding: 1rem 2rem; border-bottom: 2px solid var(--border);
+        }
+        .subtab {
+            padding: 0.5rem 1rem; border: none; background: white; border-radius: 6px;
+            cursor: pointer; font-family: 'Work Sans', sans-serif; font-size: 0.85rem;
+            font-weight: 600; transition: all 0.2s; box-shadow: 0 1px 3px var(--shadow);
+        }
+        .subtab:hover { background: var(--primary); color: white; }
+        .subtab.active { background: var(--primary); color: white; }
+        
+        .subcontent { display: none; }
+        .subcontent.active { display: block; }
+        
         .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem; }
         .stat-card { background: var(--surface); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px var(--shadow); border-left: 4px solid var(--primary); }
@@ -52,6 +92,7 @@
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
         .btn-secondary { background: var(--secondary); color: white; }
+        .btn-success { background: var(--success); color: white; }
         .btn-danger { background: #F56565; color: white; padding: 0.5rem 1rem; font-size: 0.8rem; }
         .btn-danger:disabled { background: #CBD5E0; cursor: not-allowed; opacity: 0.6; }
         .search-bar { margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center; }
@@ -69,60 +110,144 @@
         .status-available { background: #C6F6D5; color: #22543D; }
         .status-checked-out { background: #FED7D7; color: #742A2A; }
         .status-reserved { background: #E9D8FD; color: #44337A; }
+        .status-pending { background: #FEF5E7; color: #7D6608; }
+        .status-quoted { background: #E0F2FE; color: #075985; }
+        .status-closed { background: #E2E8F0; color: #475569; }
         input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--surface); padding: 2rem; border-radius: 12px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; border-top: 4px solid var(--primary); }
-        .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
+        .modal-content { background: var(--surface); padding: 2rem; border-radius: 12px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; border-top: 4px solid var(--primary); }
+        .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
         .checkout-section { background: #FFF5F5; padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--primary); margin-top: 1rem; }
         .checkout-section h3 { color: var(--primary); margin-bottom: 1rem; }
+        
+        .project-card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--primary); box-shadow: 0 2px 8px var(--shadow); }
+        .project-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+        .project-title { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+        .project-meta { font-size: 0.85rem; color: var(--text-light); margin-bottom: 0.5rem; }
+        .owner-badge { display: inline-block; padding: 0.25rem 0.75rem; background: var(--secondary); color: white; border-radius: 15px; font-size: 0.75rem; margin-right: 0.5rem; }
+        .timeline-info { background: #FFF9E6; padding: 0.75rem; border-radius: 6px; border-left: 3px solid #D69E2E; margin-top: 0.5rem; font-size: 0.85rem; }
+        .bom-item { background: var(--bg); padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .photo-preview { display: inline-block; width: 100px; height: 100px; object-fit: cover; border-radius: 8px; margin: 0.5rem 0.5rem 0.5rem 0; cursor: pointer; }
+        .photo-preview:hover { opacity: 0.8; }
+        .file-input-label { display: inline-block; padding: 0.5rem 1rem; background: var(--secondary); color: white; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+        .file-input-label:hover { background: #1A202C; }
+        input[type="file"] { display: none; }
+        
+        #map, #siteMap { height: 600px; width: 100%; border-radius: 12px; box-shadow: 0 2px 8px var(--shadow); }
+        .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .upload-zone:hover { border-color: var(--primary); background: var(--bg); }
+        .upload-zone.dragover { border-color: var(--primary); background: #FFF5F5; }
+        
+        @media (max-width: 768px) {
+            .header-content { flex-direction: column; }
+            .header-right { text-align: left; }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-content">
-            <div>
-                <h1>George E Booth Co.</h1>
-                <p class="subtitle">Equipment Inventory System - IL American Water</p>
+            <div class="header-left">
+                <h1>George E. Booth Co., LLC</h1>
+                <p class="subtitle">Equipment Inventory & Project Pipeline - IL American Water</p>
                 <p class="subtitle">Products and Services for Process Measurement and Control</p>
                 <p class="address">
                     📍 <a href="https://www.google.com/maps/dir/?api=1&destination=43+E+Belmont+Dr,+Romeoville,+IL+60446" target="_blank">43 E Belmont Dr, Romeoville, IL 60446</a>
                 </p>
             </div>
+            <div class="header-right">
+                <div class="contact-info">
+                    <div><strong>Will McGowen</strong></div>
+                    <div><a href="tel:317-767-1849">📞 317-767-1849</a></div>
+                    <div><a href="mailto:will.mcgowen@gebooth.com">✉️ will.mcgowen@gebooth.com</a></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="container">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total Items</div>
-                <div class="stat-value" id="totalItems">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Available</div>
-                <div class="stat-value" id="availableItems" style="color: var(--success)">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Checked Out</div>
-                <div class="stat-value" id="checkedOutItems" style="color: var(--primary)">0</div>
-            </div>
-        </div>
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('inventory')">Inventory</button>
+        <button class="tab" onclick="switchTab('projects')">Project Pipeline</button>
+        <button class="tab" onclick="switchTab('locations')">Locations</button>
+    </div>
 
-        <div class="controls">
-            <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Add New Equipment</h2>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Equipment Name <span class="required">*</span></label>
-                    <input type="text" id="equipmentName" placeholder="e.g., Pressure Transmitter">
+    <!-- INVENTORY TAB -->
+    <div id="inventory-tab" class="tab-content active">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Items</div>
+                    <div class="stat-value" id="totalItems">0</div>
                 </div>
-                <div class="form-group">
-                    <label>Parent Equipment</label>
-                    <input type="text" id="parentEquipment" placeholder="e.g., Spare part for an instrument?">
+                <div class="stat-card">
+                    <div class="stat-label">Available</div>
+                    <div class="stat-value" id="availableItems" style="color: var(--success)">0</div>
                 </div>
-                <div class="form-group">
-                    <label>Technology <span class="required">*</span></label>
-                    <select id="technology">
-                        <option value="">Select Technology</option>
+                <div class="stat-card">
+                    <div class="stat-label">Checked Out</div>
+                    <div class="stat-value" id="checkedOutItems" style="color: var(--primary)">0</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Add New Equipment</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Equipment Name <span class="required">*</span></label>
+                        <input type="text" id="equipmentName" placeholder="e.g., Pressure Transmitter">
+                    </div>
+                    <div class="form-group">
+                        <label>Parent Equipment</label>
+                        <input type="text" id="parentEquipment" placeholder="e.g., Spare part for an instrument?">
+                    </div>
+                    <div class="form-group">
+                        <label>Technology <span class="required">*</span></label>
+                        <select id="technology">
+                            <option value="">Select Technology</option>
+                            <option>Flow</option>
+                            <option>Level</option>
+                            <option>Pressure</option>
+                            <option>Temperature</option>
+                            <option>Recorder</option>
+                            <option>pH</option>
+                            <option>Conductivity</option>
+                            <option>Chlorine</option>
+                            <option>Oxygen</option>
+                            <option>Orthophosphate</option>
+                            <option>Total Phosphorus</option>
+                            <option>Gas Detection</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity <span class="required">*</span></label>
+                        <input type="number" id="quantity" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="status">
+                            <option>Available</option>
+                            <option>Checked Out</option>
+                            <option>Reserved</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Storage Location <span class="required">*</span></label>
+                        <input type="text" id="storageLocation" placeholder="e.g., Warehouse A, Shelf 3">
+                    </div>
+                </div>
+                <div class="form-group full-width" style="margin-bottom: 1.5rem;">
+                    <label>Notes / Description</label>
+                    <textarea id="notes" placeholder="Additional information..."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="addEquipment()">Add Equipment</button>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; margin-bottom: 0.5rem;">Filter by Technology</label>
+                    <select id="filterTechnology" onchange="filterInventory()" style="width: 100%;">
+                        <option value="">All Technologies</option>
                         <option>Flow</option>
                         <option>Level</option>
                         <option>Pressure</option>
@@ -137,95 +262,218 @@
                         <option>Gas Detection</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Quantity <span class="required">*</span></label>
-                    <input type="number" id="quantity" min="1" value="1">
-                </div>
-                <div class="form-group">
-                    <label>Status <span class="required">*</span></label>
-                    <select id="status">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; margin-bottom: 0.5rem;">Filter by Status</label>
+                    <select id="filterStatus" onchange="filterInventory()" style="width: 100%;">
+                        <option value="">All Statuses</option>
                         <option>Available</option>
                         <option>Checked Out</option>
                         <option>Reserved</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Storage Location <span class="required">*</span></label>
-                    <input type="text" id="storageLocation" placeholder="e.g., Warehouse A, Shelf 3">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; margin-bottom: 0.5rem;">Filter by Storage Location</label>
+                    <select id="filterLocation" onchange="filterInventory()" style="width: 100%;">
+                        <option value="">All Locations</option>
+                    </select>
                 </div>
             </div>
-            <div class="form-group full-width" style="margin-bottom: 1.5rem;">
-                <label>Notes / Description</label>
-                <textarea id="notes" placeholder="Additional information..."></textarea>
-            </div>
-            <button class="btn btn-primary" onclick="addEquipment()">Add Equipment</button>
-        </div>
 
-        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 200px;">
-                <label style="display: block; margin-bottom: 0.5rem;">Filter by Technology</label>
-                <select id="filterTechnology" onchange="filterInventory()" style="width: 100%;">
-                    <option value="">All Technologies</option>
-                    <option>Flow</option>
-                    <option>Level</option>
-                    <option>Pressure</option>
-                    <option>Temperature</option>
-                    <option>Recorder</option>
-                    <option>pH</option>
-                    <option>Conductivity</option>
-                    <option>Chlorine</option>
-                    <option>Oxygen</option>
-                    <option>Orthophosphate</option>
-                    <option>Total Phosphorus</option>
-                    <option>Gas Detection</option>
-                </select>
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search equipment..." onkeyup="filterInventory()">
+                <button class="btn btn-secondary" onclick="toggleSelectAll('inventory')">Select All</button>
+                <button class="btn btn-danger" id="deleteSelectedBtn" onclick="bulkDelete()" disabled>Delete Selected (<span id="selectedCount">0</span>)</button>
             </div>
-            <div style="flex: 1; min-width: 200px;">
-                <label style="display: block; margin-bottom: 0.5rem;">Filter by Status</label>
-                <select id="filterStatus" onchange="filterInventory()" style="width: 100%;">
-                    <option value="">All Statuses</option>
-                    <option>Available</option>
-                    <option>Checked Out</option>
-                    <option>Reserved</option>
-                </select>
-            </div>
-            <div style="flex: 1; min-width: 200px;">
-                <label style="display: block; margin-bottom: 0.5rem;">Filter by Storage Location</label>
-                <select id="filterLocation" onchange="filterInventory()" style="width: 100%;">
-                    <option value="">All Locations</option>
-                </select>
-            </div>
-        </div>
 
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Search equipment..." onkeyup="filterInventory()">
-            <button class="btn btn-danger" id="deleteSelectedBtn" onclick="bulkDelete()" disabled>Delete Selected (<span id="selectedCount">0</span>)</button>
-        </div>
-
-        <div class="inventory-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">Select</th>
-                        <th>Equipment Name</th>
-                        <th>Parent Equipment</th>
-                        <th>Technology</th>
-                        <th>Qty</th>
-                        <th>Status</th>
-                        <th>Storage Location</th>
-                        <th>Checked Out By</th>
-                        <th>Checkout Date</th>
-                        <th>Notes</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="inventoryBody">
-                    <tr><td colspan="11" style="text-align:center; padding:2rem;">Loading inventory...</td></tr>
-                </tbody>
-            </table>
+            <div class="inventory-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">Select</th>
+                            <th>Equipment Name</th>
+                            <th>Parent Equipment</th>
+                            <th>Technology</th>
+                            <th>Qty</th>
+                            <th>Status</th>
+                            <th>Storage Location</th>
+                            <th>Checked Out By</th>
+                            <th>Checkout Date</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryBody">
+                        <tr><td colspan="11" style="text-align:center; padding:2rem;">Loading inventory...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
+    <!-- PROJECT PIPELINE TAB -->
+    <div id="projects-tab" class="tab-content">
+        <div class="subtabs">
+            <button class="subtab active" onclick="switchProjectSubtab('overview')">Overview</button>
+            <button class="subtab" onclick="switchProjectSubtab('new')">New Project</button>
+        </div>
+        
+        <div id="projects-overview" class="subcontent active">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Projects</div>
+                        <div class="stat-value" id="totalProjects">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Pending Quote</div>
+                        <div class="stat-value" id="pendingProjects" style="color: #D69E2E">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Quoted</div>
+                        <div class="stat-value" id="quotedProjects" style="color: #3182CE">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Closed</div>
+                        <div class="stat-value" id="closedProjects" style="color: var(--success)">0</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <select id="filterProjectStatus" onchange="renderProjects()" style="padding: 0.75rem; width: 250px; border-radius: 8px; border: 2px solid var(--border);">
+                        <option value="">All Projects</option>
+                        <option value="Pending">Pending Quote</option>
+                        <option value="Quoted">Quoted</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+
+                <div id="projectsList"></div>
+            </div>
+        </div>
+
+        <div id="projects-new" class="subcontent">
+            <div class="container">
+                <div class="controls">
+                    <h2 style="color: var(--primary); margin-bottom: 1.5rem;">New Project Submission</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Project Name <span class="required">*</span></label>
+                            <input type="text" id="projectName" placeholder="e.g., Booster Station Upgrade">
+                        </div>
+                        <div class="form-group">
+                            <label>Project Owner <span class="required">*</span></label>
+                            <select id="projectOwner">
+                                <option value="">Select Owner</option>
+                                <option>Will M</option>
+                                <option>Mike O</option>
+                                <option>Devin T</option>
+                                <option>Eric P</option>
+                                <option>Troy B</option>
+                                <option>Jason G</option>
+                                <option>Sales4</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group full-width" style="margin-bottom: 1.5rem;">
+                        <label>Project Description</label>
+                        <textarea id="projectDescription" placeholder="Describe the project requirements..."></textarea>
+                    </div>
+                    
+                    <h3 style="margin-bottom: 1rem;">Location Information (Optional)</h3>
+                    <div class="form-grid" style="margin-bottom: 1.5rem;">
+                        <div class="form-group full-width">
+                            <label>Address</label>
+                            <input type="text" id="projectAddress" placeholder="e.g., 123 Main St, City, State 12345">
+                        </div>
+                        <div class="form-group">
+                            <label>Latitude</label>
+                            <input type="number" id="projectLat" placeholder="e.g., 41.6474" step="any">
+                        </div>
+                        <div class="form-group">
+                            <label>Longitude</label>
+                            <input type="number" id="projectLng" placeholder="e.g., -88.0896" step="any">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-secondary" onclick="getCurrentLocation()">📍 Use Current Location</button>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="margin-bottom: 1rem;">Bill of Materials</h3>
+                        <div id="bomItems"></div>
+                        <div class="form-grid" style="margin-top: 1rem;">
+                            <div class="form-group">
+                                <input type="text" id="bomItemName" placeholder="Item name">
+                            </div>
+                            <div class="form-group">
+                                <input type="number" id="bomItemQty" placeholder="Quantity" min="1" value="1">
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="bomItemSpecs" placeholder="Specifications/Part Number">
+                            </div>
+                            <div class="form-group">
+                                <button class="btn btn-secondary" onclick="addBOMItem()">Add Item</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label>Photos (optional)</label>
+                        <input type="file" id="projectPhotos" accept="image/*" multiple onchange="handlePhotoUpload(event)">
+                        <label for="projectPhotos" class="file-input-label">📷 Upload Photos</label>
+                        <div id="photoPreview" style="margin-top: 1rem;"></div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="submitProject()">Submit Project</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOCATIONS TAB -->
+    <div id="locations-tab" class="tab-content">
+        <div class="subtabs">
+            <button class="subtab active" onclick="switchLocationSubtab('assets')">Asset Map</button>
+            <button class="subtab" onclick="switchLocationSubtab('sites')">Site Map</button>
+        </div>
+        
+        <div id="locations-assets" class="subcontent active">
+            <div class="container">
+                <div class="controls">
+                    <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Upload Asset List</h2>
+                    <p style="margin-bottom: 1rem;">Upload an Excel file (.xlsx or .csv) with columns: Name, Latitude, Longitude, and any other details you want to display.</p>
+                    
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('assetFile').click()">
+                        <input type="file" id="assetFile" accept=".xlsx,.xls,.csv" onchange="handleAssetUpload(event)" style="display:none;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
+                        <h3>Click to upload or drag & drop</h3>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;">Excel (.xlsx, .xls) or CSV files</p>
+                    </div>
+                    
+                    <div id="assetStats" style="margin-top: 1rem; display: none;">
+                        <p><strong>Loaded Assets:</strong> <span id="assetCount">0</span></p>
+                        <button class="btn btn-danger" onclick="clearAssets()" style="margin-top: 0.5rem;">Clear All Assets</button>
+                    </div>
+                </div>
+
+                <div id="map"></div>
+            </div>
+        </div>
+        
+        <div id="locations-sites" class="subcontent">
+            <div class="container">
+                <div class="controls">
+                    <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Project Sites</h2>
+                    <p style="margin-bottom: 1rem;">View all project locations on the map</p>
+                </div>
+
+                <div id="siteMap"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Equipment Modal -->
     <div class="modal" id="editModal">
         <div class="modal-content">
             <h2 style="color: var(--primary); margin-bottom: 1.5rem;">Edit Equipment</h2>
@@ -296,12 +544,34 @@
         </div>
     </div>
 
+    <!-- View Project Modal -->
+    <div class="modal" id="viewProjectModal">
+        <div class="modal-content">
+            <div id="projectDetailContent"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="generateQuoteList()">📋 Generate Quote List</button>
+                <button class="btn btn-secondary" onclick="closeViewProjectModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         let inventory = [];
+        let projects = [];
+        let assets = [];
         let currentEditIndex = null;
+        let currentProjectIndex = null;
+        let currentBOMItems = [];
+        let currentPhotos = [];
+        let map = null;
+        let siteMap = null;
+        let markers = [];
+        let siteMarkers = [];
         const STORAGE_KEY = 'geb_inventory';
+        const PROJECTS_KEY = 'geb_projects';
+        const ASSETS_KEY = 'geb_assets';
 
-        // Use localStorage instead of window.storage
         const storage = {
             async set(key, value) {
                 try {
@@ -332,8 +602,76 @@
             }
         };
 
-        window.addEventListener('load', loadInventory);
+        window.addEventListener('load', () => {
+            loadInventory();
+            loadProjects();
+            loadAssets();
+            initMaps();
+        });
 
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'inventory') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('inventory-tab').classList.add('active');
+            } else if (tab === 'projects') {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('projects-tab').classList.add('active');
+                renderProjects();
+            } else if (tab === 'locations') {
+                document.querySelector('.tab:nth-child(3)').classList.add('active');
+                document.getElementById('locations-tab').classList.add('active');
+                setTimeout(() => {
+                    if (map) map.invalidateSize();
+                    if (siteMap) siteMap.invalidateSize();
+                    renderAssetsOnMap();
+                    renderSitesOnMap();
+                }, 100);
+            }
+        }
+
+        function switchProjectSubtab(subtab) {
+            document.querySelectorAll('#projects-tab .subtab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#projects-tab .subcontent').forEach(c => c.classList.remove('active'));
+            
+            if (subtab === 'overview') {
+                document.querySelector('#projects-tab .subtab:nth-child(1)').classList.add('active');
+                document.getElementById('projects-overview').classList.add('active');
+                renderProjects();
+            } else if (subtab === 'new') {
+                document.querySelector('#projects-tab .subtab:nth-child(2)').classList.add('active');
+                document.getElementById('projects-new').classList.add('active');
+            }
+        }
+
+        function switchLocationSubtab(subtab) {
+            document.querySelectorAll('#locations-tab .subtab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#locations-tab .subcontent').forEach(c => c.classList.remove('active'));
+            
+            if (subtab === 'assets') {
+                document.querySelector('#locations-tab .subtab:nth-child(1)').classList.add('active');
+                document.getElementById('locations-assets').classList.add('active');
+                setTimeout(() => {
+                    if (map) {
+                        map.invalidateSize();
+                        renderAssetsOnMap();
+                    }
+                }, 100);
+            } else if (subtab === 'sites') {
+                document.querySelector('#locations-tab .subtab:nth-child(2)').classList.add('active');
+                document.getElementById('locations-sites').classList.add('active');
+                setTimeout(() => {
+                    if (siteMap) {
+                        siteMap.invalidateSize();
+                        renderSitesOnMap();
+                    }
+                }, 100);
+            }
+        }
+
+        // INVENTORY FUNCTIONS
         async function loadInventory() {
             try {
                 const data = await storage.get(STORAGE_KEY);
@@ -428,13 +766,15 @@
             updateDeleteButton();
         }
 
-        function updateDeleteButton() {
-            const checkboxes = document.querySelectorAll('.item-checkbox:checked');
-            const deleteBtn = document.getElementById('deleteSelectedBtn');
-            const countSpan = document.getElementById('selectedCount');
+        function toggleSelectAll(context) {
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
             
-            countSpan.textContent = checkboxes.length;
-            deleteBtn.disabled = checkboxes.length === 0;
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+            
+            updateDeleteButton();
         }
 
         function updateLocationFilter() {
@@ -459,7 +799,7 @@
             const rows = document.querySelectorAll('#inventoryBody tr');
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
-                if (cells.length < 2) return; // Skip empty state row
+                if (cells.length < 2) return;
                 
                 const text = row.textContent.toLowerCase();
                 const technology = cells[3].textContent.trim();
@@ -479,6 +819,15 @@
             document.getElementById('totalItems').textContent = inventory.length;
             document.getElementById('availableItems').textContent = inventory.filter(i => i.status === 'Available').length;
             document.getElementById('checkedOutItems').textContent = inventory.filter(i => i.status === 'Checked Out').length;
+        }
+
+        function updateDeleteButton() {
+            const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            const countSpan = document.getElementById('selectedCount');
+            
+            countSpan.textContent = checkboxes.length;
+            deleteBtn.disabled = checkboxes.length === 0;
         }
 
         async function bulkDelete() {
@@ -560,8 +909,498 @@
             updateStats();
         }
 
+        // PROJECT FUNCTIONS
+        async function loadProjects() {
+            try {
+                const data = await storage.get(PROJECTS_KEY);
+                if (data && data.value) {
+                    projects = JSON.parse(data.value);
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+            updateProjectStats();
+        }
+
+        async function saveProjects() {
+            try {
+                await storage.set(PROJECTS_KEY, JSON.stringify(projects));
+            } catch (error) {
+                console.error('Save error:', error);
+            }
+        }
+
+        function addBOMItem() {
+            const name = document.getElementById('bomItemName').value.trim();
+            const qty = parseInt(document.getElementById('bomItemQty').value) || 1;
+            const specs = document.getElementById('bomItemSpecs').value.trim();
+
+            if (!name) {
+                alert('Please enter item name');
+                return;
+            }
+
+            currentBOMItems.push({ name, qty, specs });
+            
+            document.getElementById('bomItemName').value = '';
+            document.getElementById('bomItemQty').value = '1';
+            document.getElementById('bomItemSpecs').value = '';
+            
+            renderBOMItems();
+        }
+
+        function renderBOMItems() {
+            const container = document.getElementById('bomItems');
+            if (currentBOMItems.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-light); font-style: italic;">No items added yet</p>';
+                return;
+            }
+
+            container.innerHTML = currentBOMItems.map((item, index) => `
+                <div class="bom-item">
+                    <span><strong>${item.qty}x</strong> ${item.name} ${item.specs ? `<br><small style="color: var(--text-light);">${item.specs}</small>` : ''}</span>
+                    <button class="btn btn-danger" onclick="removeBOMItem(${index})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function removeBOMItem(index) {
+            currentBOMItems.splice(index, 1);
+            renderBOMItems();
+        }
+
+        function handlePhotoUpload(event) {
+            const files = Array.from(event.target.files);
+            
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentPhotos.push(e.target.result);
+                    renderPhotoPreview();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderPhotoPreview() {
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = currentPhotos.map((photo, index) => `
+                <img src="${photo}" class="photo-preview" onclick="viewPhoto(${index})" />
+            `).join('');
+        }
+
+        function viewPhoto(index) {
+            window.open(currentPhotos[index], '_blank');
+        }
+
+        function getCurrentLocation() {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        document.getElementById('projectLat').value = position.coords.latitude.toFixed(6);
+                        document.getElementById('projectLng').value = position.coords.longitude.toFixed(6);
+                        alert('Location captured!');
+                    },
+                    (error) => {
+                        alert('Unable to get location: ' + error.message);
+                    }
+                );
+            } else {
+                alert('Geolocation is not supported by your browser');
+            }
+        }
+
+        function calculateResponseDate(owner) {
+            const now = new Date();
+            const daysToAdd = {
+                'Will M': 2,
+                'Mike O': 3,
+                'Devin T': 2,
+                'Eric P': 3,
+                'Troy B': 3,
+                'Jason G': 5,
+                'Sales4': 7
+            };
+            
+            const days = daysToAdd[owner] || 3;
+            const responseDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+            return responseDate.toLocaleDateString();
+        }
+
+        async function submitProject() {
+            const name = document.getElementById('projectName').value.trim();
+            const owner = document.getElementById('projectOwner').value;
+            const description = document.getElementById('projectDescription').value.trim();
+            const address = document.getElementById('projectAddress').value.trim();
+            const lat = parseFloat(document.getElementById('projectLat').value);
+            const lng = parseFloat(document.getElementById('projectLng').value);
+
+            if (!name || !owner) {
+                alert('Please fill in project name and select an owner');
+                return;
+            }
+
+            if (currentBOMItems.length === 0) {
+                alert('Please add at least one item to the Bill of Materials');
+                return;
+            }
+
+            const project = {
+                id: 'proj_' + Date.now(),
+                name,
+                owner,
+                description,
+                address: address || null,
+                bom: [...currentBOMItems],
+                photos: [...currentPhotos],
+                latitude: lat || null,
+                longitude: lng || null,
+                status: 'Pending',
+                createdAt: new Date().toISOString(),
+                responseBy: calculateResponseDate(owner),
+                timestamp: Date.now()
+            };
+
+            projects.push(project);
+            await saveProjects();
+
+            document.getElementById('projectName').value = '';
+            document.getElementById('projectOwner').value = '';
+            document.getElementById('projectDescription').value = '';
+            document.getElementById('projectAddress').value = '';
+            document.getElementById('projectLat').value = '';
+            document.getElementById('projectLng').value = '';
+            document.getElementById('projectPhotos').value = '';
+            currentBOMItems = [];
+            currentPhotos = [];
+            renderBOMItems();
+            document.getElementById('photoPreview').innerHTML = '';
+
+            alert('Project submitted successfully!');
+            switchProjectSubtab('overview');
+            updateProjectStats();
+        }
+
+        function renderProjects() {
+            const container = document.getElementById('projectsList');
+            const filter = document.getElementById('filterProjectStatus').value;
+            
+            const filtered = filter ? projects.filter(p => p.status === filter) : projects;
+            const sorted = filtered.sort((a, b) => b.timestamp - a.timestamp);
+
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="project-card"><p style="text-align:center; color: var(--text-light);">No projects yet. Create your first project!</p></div>';
+                return;
+            }
+
+            container.innerHTML = sorted.map((project) => `
+                <div class="project-card">
+                    <div class="project-header">
+                        <div style="flex: 1;">
+                            <div class="project-title">${project.name}</div>
+                            <div class="project-meta">
+                                <span class="owner-badge">${project.owner}</span>
+                                Created ${new Date(project.createdAt).toLocaleDateString()}
+                                ${project.address ? ' • 📍 ' + project.address : (project.latitude && project.longitude ? ' • 📍 Location Added' : '')}
+                            </div>
+                            <span class="status-badge status-${project.status.toLowerCase()}">${project.status}</span>
+                            ${project.status === 'Pending' ? `<div class="timeline-info">⏰ Response expected by: <strong>${project.responseBy}</strong></div>` : ''}
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="viewProject(${projects.indexOf(project)})">View Details</button>
+                            ${project.status === 'Pending' ? `<button class="btn btn-success" onclick="markAsQuoted(${projects.indexOf(project)})">Mark as Quoted</button>` : ''}
+                            ${project.status === 'Quoted' ? `<button class="btn btn-success" onclick="markAsClosed(${projects.indexOf(project)})">Close Project</button>` : ''}
+                        </div>
+                    </div>
+                    <div><strong>BOM Items:</strong> ${project.bom.length} | <strong>Photos:</strong> ${project.photos.length}</div>
+                </div>
+            `).join('');
+        }
+
+        function viewProject(index) {
+            currentProjectIndex = index;
+            const project = projects[index];
+            const content = document.getElementById('projectDetailContent');
+            
+            let locationHTML = '';
+            if (project.address) {
+                locationHTML = `<div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+                    <strong>📍 Address:</strong> ${project.address}
+                    ${project.latitude && project.longitude ? `<br><strong>Coordinates:</strong> ${project.latitude.toFixed(6)}, ${project.longitude.toFixed(6)}` : ''}
+                    ${project.latitude && project.longitude ? `<a href="https://www.google.com/maps?q=${project.latitude},${project.longitude}" target="_blank" style="margin-left: 1rem; color: var(--primary);">View on Map</a>` : ''}
+                </div>`;
+            } else if (project.latitude && project.longitude) {
+                locationHTML = `<div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+                    <strong>📍 Coordinates:</strong> ${project.latitude.toFixed(6)}, ${project.longitude.toFixed(6)}
+                    <a href="https://www.google.com/maps?q=${project.latitude},${project.longitude}" target="_blank" style="margin-left: 1rem; color: var(--primary);">View on Map</a>
+                </div>`;
+            }
+            
+            content.innerHTML = `
+                <h2 style="color: var(--primary); margin-bottom: 1rem;">${project.name}</h2>
+                <div class="project-meta">
+                    <span class="owner-badge">${project.owner}</span>
+                    Created ${new Date(project.createdAt).toLocaleDateString()}
+                </div>
+                <span class="status-badge status-${project.status.toLowerCase()}">${project.status}</span>
+                ${project.status === 'Pending' ? `<div class="timeline-info" style="margin-top: 1rem;">⏰ Response expected by: <strong>${project.responseBy}</strong></div>` : ''}
+                
+                ${locationHTML}
+                
+                ${project.description ? `<div style="margin-top: 1rem;"><strong>Description:</strong><p>${project.description}</p></div>` : ''}
+                
+                <div style="margin-top: 1.5rem;">
+                    <h3 style="margin-bottom: 0.5rem;">Bill of Materials</h3>
+                    ${project.bom.map(item => `
+                        <div class="bom-item">
+                            <span><strong>${item.qty}x</strong> ${item.name}${item.specs ? `<br><small style="color: var(--text-light);">${item.specs}</small>` : ''}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                ${project.photos.length > 0 ? `
+                    <div style="margin-top: 1.5rem;">
+                        <h3 style="margin-bottom: 0.5rem;">Photos</h3>
+                        ${project.photos.map((photo, i) => `<img src="${photo}" class="photo-preview" onclick="viewPhoto(${i})" />`).join('')}
+                    </div>
+                ` : ''}
+            `;
+            
+            currentPhotos = [...project.photos];
+            document.getElementById('viewProjectModal').classList.add('active');
+        }
+
+        function closeViewProjectModal() {
+            document.getElementById('viewProjectModal').classList.remove('active');
+            currentProjectIndex = null;
+        }
+
+        async function markAsQuoted(index) {
+            projects[index].status = 'Quoted';
+            projects[index].quotedAt = new Date().toISOString();
+            await saveProjects();
+            renderProjects();
+            updateProjectStats();
+        }
+
+        async function markAsClosed(index) {
+            if (!confirm('Mark this project as closed? This indicates it has been added to Salesforce.')) return;
+            
+            projects[index].status = 'Closed';
+            projects[index].closedAt = new Date().toISOString();
+            await saveProjects();
+            renderProjects();
+            updateProjectStats();
+        }
+
+        function generateQuoteList() {
+            if (currentProjectIndex === null) return;
+            
+            const project = projects[currentProjectIndex];
+            let text = `QUOTE REQUEST - ${project.name}\n`;
+            text += `Owner: ${project.owner}\n`;
+            text += `Response Expected By: ${project.responseBy}\n`;
+            text += `Date Submitted: ${new Date(project.createdAt).toLocaleDateString()}\n`;
+            
+            if (project.address) {
+                text += `Address: ${project.address}\n`;
+            }
+            if (project.latitude && project.longitude) {
+                text += `Coordinates: ${project.latitude.toFixed(6)}, ${project.longitude.toFixed(6)}\n`;
+            }
+            
+            text += `\n--- BILL OF MATERIALS ---\n\n`;
+            
+            project.bom.forEach((item, i) => {
+                text += `${i + 1}. ${item.name}\n`;
+                text += `   Quantity: ${item.qty}\n`;
+                if (item.specs) text += `   Specs: ${item.specs}\n`;
+                text += `\n`;
+            });
+            
+            if (project.description) {
+                text += `\n--- PROJECT NOTES ---\n${project.description}\n`;
+            }
+            
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Quote_${project.name.replace(/\s+/g, '_')}_${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function updateProjectStats() {
+            document.getElementById('totalProjects').textContent = projects.length;
+            document.getElementById('pendingProjects').textContent = projects.filter(p => p.status === 'Pending').length;
+            document.getElementById('quotedProjects').textContent = projects.filter(p => p.status === 'Quoted').length;
+            document.getElementById('closedProjects').textContent = projects.filter(p => p.status === 'Closed').length;
+        }
+
+        // MAPS FUNCTIONS
+        function initMaps() {
+            map = L.map('map').setView([41.6474, -88.0896], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            siteMap = L.map('siteMap').setView([41.6474, -88.0896], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(siteMap);
+        }
+
+        async function loadAssets() {
+            try {
+                const data = await storage.get(ASSETS_KEY);
+                if (data && data.value) {
+                    assets = JSON.parse(data.value);
+                    updateAssetCount();
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+        }
+
+        async function saveAssets() {
+            try {
+                await storage.set(ASSETS_KEY, JSON.stringify(assets));
+            } catch (error) {
+                console.error('Save error:', error);
+            }
+        }
+
+        function handleAssetUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                assets = jsonData.filter(row => row.Latitude && row.Longitude).map(row => ({
+                    name: row.Name || 'Unnamed Asset',
+                    latitude: parseFloat(row.Latitude),
+                    longitude: parseFloat(row.Longitude),
+                    ...row
+                }));
+
+                saveAssets();
+                updateAssetCount();
+                renderAssetsOnMap();
+                alert(`Loaded ${assets.length} assets with valid coordinates`);
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function updateAssetCount() {
+            document.getElementById('assetCount').textContent = assets.length;
+            document.getElementById('assetStats').style.display = assets.length > 0 ? 'block' : 'none';
+        }
+
+        function renderAssetsOnMap() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            if (assets.length === 0) return;
+
+            const bounds = [];
+
+            assets.forEach(asset => {
+                const marker = L.marker([asset.latitude, asset.longitude])
+                    .addTo(map)
+                    .bindPopup(`<strong>${asset.name}</strong><br>${Object.entries(asset).filter(([k]) => k !== 'latitude' && k !== 'longitude' && k !== 'Latitude' && k !== 'Longitude').map(([k, v]) => `${k}: ${v}`).join('<br>')}`);
+                
+                markers.push(marker);
+                bounds.push([asset.latitude, asset.longitude]);
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        function renderSitesOnMap() {
+            siteMarkers.forEach(m => siteMap.removeLayer(m));
+            siteMarkers = [];
+
+            const sitesWithLocations = projects.filter(p => p.latitude && p.longitude);
+            
+            if (sitesWithLocations.length === 0) return;
+
+            const bounds = [];
+
+            sitesWithLocations.forEach(project => {
+                const color = project.status === 'Pending' ? '#D69E2E' : project.status === 'Quoted' ? '#3182CE' : '#38A169';
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+                
+                const popupContent = `<strong>${project.name}</strong><br>Owner: ${project.owner}<br>Status: ${project.status}${project.address ? '<br>📍 ' + project.address : ''}`;
+                
+                const marker = L.marker([project.latitude, project.longitude], { icon })
+                    .addTo(siteMap)
+                    .bindPopup(popupContent);
+                
+                siteMarkers.push(marker);
+                bounds.push([project.latitude, project.longitude]);
+            });
+
+            if (bounds.length > 0) {
+                siteMap.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        async function clearAssets() {
+            if (!confirm('Clear all assets from the map?')) return;
+            
+            assets = [];
+            await saveAssets();
+            updateAssetCount();
+            renderAssetsOnMap();
+        }
+
+        // Drag and drop support
+        const uploadZone = document.getElementById('uploadZone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => uploadZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => uploadZone.classList.remove('dragover'), false);
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            document.getElementById('assetFile').files = files;
+            handleAssetUpload({ target: { files } });
+        });
+
+        // Modal close on outside click
         document.getElementById('editModal').addEventListener('click', function(e) {
             if (e.target === this) closeEditModal();
+        });
+        
+        document.getElementById('viewProjectModal').addEventListener('click', function(e) {
+            if (e.target === this) closeViewProjectModal();
         });
     </script>
 </body>
