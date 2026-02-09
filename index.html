@@ -281,6 +281,12 @@
                 </div>
             </div>
 
+            <div style="margin-bottom: 1rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="exportAllData()" style="padding: 0.5rem 1rem; font-size: 0.8rem;">📥 Download All Data</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()" style="padding: 0.5rem 1rem; font-size: 0.8rem;">📤 Upload Data</button>
+                <input type="file" id="importFile" accept=".json" onchange="importAllData(event)" style="display: none;">
+            </div>
+
             <div class="search-bar">
                 <input type="text" id="searchInput" placeholder="Search equipment..." onkeyup="filterInventory()">
                 <button class="btn btn-secondary" onclick="toggleSelectAll('inventory')">Select All</button>
@@ -1595,6 +1601,65 @@
 
         setupDragDrop('assetUploadZone', 'assetFile', handleAssetUpload);
         setupDragDrop('siteUploadZone', 'siteFile', handleSiteUpload);
+
+        // Export/Import Functions
+        function exportAllData() {
+            const data = {
+                inventory: inventory,
+                projects: projects,
+                assets: assets,
+                sites: sites,
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `GEB_Inventory_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert('Data exported successfully! Save this file to restore your data later.');
+        }
+
+        function importAllData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (confirm('This will replace all current data. Are you sure you want to continue?')) {
+                        inventory = data.inventory || [];
+                        projects = data.projects || [];
+                        assets = data.assets || [];
+                        sites = data.sites || [];
+                        
+                        await saveInventory();
+                        await saveProjects();
+                        await saveAssets();
+                        await saveSites();
+                        
+                        renderInventory();
+                        updateStats();
+                        renderProjects();
+                        updateProjectStats();
+                        updateAssetCount();
+                        updateSiteCount();
+                        renderAssetsOnMap();
+                        renderSitesOnMap();
+                        
+                        alert('Data imported successfully!');
+                    }
+                } catch (error) {
+                    alert('Error importing data: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
 
         // Modal close
         document.getElementById('editModal').addEventListener('click', function(e) {
